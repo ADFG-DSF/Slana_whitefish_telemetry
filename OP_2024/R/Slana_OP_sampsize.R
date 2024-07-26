@@ -82,6 +82,8 @@ for(natleast in 1:2) {
 }
 
 
+
+## Making a figure with EVERYTHING!!
 ptab_gplot <- detection_probability(n_raw = n_table,
                                     prop_usedby = c(0.025, 0.05, 0.1),
                                     prop_ofareas = c(0.9, 1),
@@ -90,7 +92,7 @@ ptab_gplot <- detection_probability(n_raw = n_table,
   left_join(data.frame(n_raw=n_table, date=dates_table)) %>%
   mutate(prop_ofareas = ifelse(prop_ofareas==0.9,
                                "At Least 90% of Areas", "All Areas")) %>%
-  mutate(prop_usedby = factor(paste(100*prop_usedby,"%"), levels=c("2.5 %","5 %", "10 %"))) %>%
+  mutate(prop_usedby = factor(paste(100*prop_usedby,"%"), levels=c("10 %","5 %", "2.5 %"))) %>%
   mutate(observe_at_least = paste("At least", observe_at_least,"fish"))
 
 plot1 <- ptab_gplot %>%
@@ -103,7 +105,8 @@ plot1 <- ptab_gplot %>%
   theme_bw() +
   labs(x="", y="Probability",title="Probability of Detecting a Single Use Area",
        lty="Detection Threshold", colour="Percent of Population") +
-  theme(text = element_text(family = "serif"))
+  theme(text = element_text(family = "serif")) +
+  scale_x_date(date_breaks = "3 months", date_labels =  "%b %Y")
 plot2 <- ptab_gplot %>%
   ggplot(aes(y=p_multipleareas,
              # x=n_raw,
@@ -115,8 +118,148 @@ plot2 <- ptab_gplot %>%
   theme_bw() +
   labs(x="", y="Probability",title="Probability of Simultaneous Detection")+
   theme(text = element_text(family = "serif")) +
-  theme(legend.position="none")
+  theme(legend.position="none") +
+  scale_x_date(date_breaks = "3 months", date_labels =  "%b %Y") +
+  theme(axis.text.x=element_text(angle=60, hjust=1))
 
 plot1 / plot2
 
 ggsave(plot = plot1 / plot2, filename="OP_2024/R_output/Figure4.png", height=8, width=8, units="in")
+
+
+
+
+## Redoing the figure, simplifying to ONLY CONSIDER >= 2 FISH
+ptab_gplot <- detection_probability(n_raw = n_table,
+                                    prop_usedby = c(0.025, 0.05, 0.1),
+                                    prop_ofareas = c(0.9, 1),
+                                    model="binomial",
+                                    observe_at_least = 2) %>%
+  left_join(data.frame(n_raw=n_table, date=dates_table)) %>%
+  mutate(prop_ofareas = ifelse(prop_ofareas==0.9,
+                               "At Least 90% of Areas", "All Areas")) %>%
+  mutate(prop_usedby = factor(paste(100*prop_usedby,"%"), levels=c("10 %","5 %", "2.5 %"))) #%>%
+# mutate(observe_at_least = paste("At least", observe_at_least,"fish"))
+
+plot1 <- ptab_gplot %>%
+  ggplot(aes(y=p_singlearea,
+             # x=n_raw,
+             x=date,
+             # lty=factor(observe_at_least),
+             colour=factor(prop_usedby))) +
+  geom_line() +
+  theme_bw() +
+  labs(x="", y="Probability",title="Probability of Detecting a Single Use Area",
+       lty="Detection Threshold", colour="Percent of Population") +
+  theme(text = element_text(family = "serif")) +
+  scale_x_date(date_breaks = "3 months", date_labels =  "%b %Y")
+plot2 <- ptab_gplot %>%
+  ggplot(aes(y=p_multipleareas,
+             # x=n_raw,
+             x=date,
+             # lty=factor(observe_at_least),
+             colour=factor(prop_usedby))) +
+  facet_wrap(~prop_ofareas) +
+  geom_line() +
+  theme_bw() +
+  labs(x="", y="Probability",title="Probability of Simultaneous Detection")+
+  theme(text = element_text(family = "serif")) +
+  theme(legend.position="none") +
+  scale_x_date(date_breaks = "3 months", date_labels =  "%b %Y") +
+  theme(axis.text.x=element_text(angle=60, hjust=1))
+
+plot1 / plot2
+
+ggsave(plot = plot1 / plot2, filename="OP_2024/R_output/Figure4_just2fish.png", height=8, width=8, units="in")
+
+
+
+## Redoing the figure, simplifying to ONLY CONSIDER >= 2 FISH and ONLY 90% OF AREAS
+ptab_gplot <- detection_probability(n_raw = n_table,
+                                    prop_usedby = c(0.025, 0.05, 0.1),
+                                    prop_ofareas = .9,
+                                    model="binomial",
+                                    observe_at_least = 2) %>%
+  left_join(data.frame(n_raw=n_table, date=dates_table)) %>%
+  # mutate(prop_ofareas = ifelse(prop_ofareas==0.9,
+  #                              "At Least 90% of Areas", "All Areas")) %>%
+  mutate(prop_usedby = factor(paste(100*prop_usedby,"%"), levels=c("10 %","5 %", "2.5 %"))) #%>%
+# mutate(observe_at_least = paste("At least", observe_at_least,"fish"))
+
+plot1 <- ptab_gplot %>%
+  ggplot(aes(y=p_singlearea,
+             # x=n_raw,
+             x=date,
+             # lty=factor(observe_at_least),
+             colour=factor(prop_usedby))) +
+  geom_line() +
+  theme_bw() +
+  labs(x="", y="Probability",title="Probability of Detecting a Single Use Area",
+       lty="Detection Threshold", colour="Percent of Population") +
+  theme(text = element_text(family = "serif")) +
+  scale_x_date(date_breaks = "3 months", date_labels =  "%b %Y")
+plot2 <- ptab_gplot %>%
+  ggplot(aes(y=p_multipleareas,
+             # x=n_raw,
+             x=date,
+             # lty=factor(observe_at_least),
+             colour=factor(prop_usedby))) +
+  # facet_wrap(~prop_ofareas) +
+  geom_line() +
+  theme_bw() +
+  labs(x="", y="Probability",title="Probability of Detecting 90% of Areas")+
+  theme(text = element_text(family = "serif")) +
+  theme(legend.position="none") +
+  scale_x_date(date_breaks = "3 months", date_labels =  "%b %Y") #+
+  # theme(axis.text.x=element_text(angle=60, hjust=1))
+
+plot1 / plot2
+
+ggsave(plot = plot1 / plot2, filename="OP_2024/R_output/Figure4_just2fish_just90.png", height=8, width=8, units="in")
+
+
+plot1 <- ptab_gplot %>%
+  pivot_longer(c(p_singlearea, p_multipleareas),
+               names_to = "Detecting",
+               values_to = "prob") %>%
+  mutate(Detecting = ifelse(Detecting=="p_singlearea", "Single Area", "At Least 90% of Areas")) %>%
+  ggplot(aes(y=prob,
+             x=date,
+             colour=factor(prop_usedby, levels=c("10 %","5 %", "2.5 %")),
+             lty = factor(Detecting, levels=c("Single Area", "At Least 90% of Areas")))) +
+  geom_line() +
+  labs(x="", y="Probability",title="Detection Probability",
+       colour="Percent of Population",
+       lty="Detecting") +
+  scale_linetype_manual(values=1:2) +
+  scale_x_date(date_breaks = "3 months", date_labels =  "%b %Y") +
+  theme_bw() +
+  theme(text = element_text(family = "serif"))
+ggsave(plot = plot1, filename="OP_2024/R_output/Figure4_just2fish_just90_v2.png", height=6, width=8, units="in")
+
+
+
+# ## creating a dummy data set to ask for help in how to make the legend work!!
+# dummydata <- data.frame(date=rep(as.Date(1:30, origin="2024-10-01"), 3),
+#                         prop_usedby = rep(c("10 %","5 %", "2.5 %"), each=30),
+#                         p_singlearea = .99^(1:90),
+#                         p_multipleareas = .98^(1:90))
+#
+#
+# dummydata %>%
+#   pivot_longer(c(p_singlearea, p_multipleareas),
+#              names_to = "Detecting",
+#              values_to = "prob") %>%
+#   mutate(Detecting = ifelse(Detecting=="p_singlearea", "Single Area", "At Least 90% of Areas")) %>%
+#   ggplot(aes(y=prob,
+#              x=date,
+#              colour=factor(prop_usedby, levels=c("10 %","5 %", "2.5 %")),
+#              lty = factor(Detecting, levels=c("Single Area", "At Least 90% of Areas")))) +
+#   geom_line() +
+#   labs(x="", y="Probability",title="Detection Probability",
+#        colour="Percent of Population",
+#        lty="Detecting") +
+#   scale_linetype_manual(values=1:2) +
+#   #scale_x_date(date_breaks = "3 months", date_labels =  "%b %Y") +
+#   theme_bw() +
+#   theme(text = element_text(family = "serif"))
