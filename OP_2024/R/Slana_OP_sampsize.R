@@ -1,3 +1,24 @@
+# Seasonal Distribution of Humpback Whitefish in the Slana River
+# Operational Plan, July 2024
+# Matt Tyers
+
+# The purpose of this script is to describe the anticipated detection probabilities
+# of seasonal use areas, given the proposed sample size of instrumented fish.
+
+# First, the anticipated number of surviving fish, given initial mortality and
+# (constant) annual mortality is described using an exponential decay function.
+
+# Then, given the anticipated number of surviving fish at a sequence of dates,
+# the probabilities of detecting a given use area are tabulated, as well as the
+# probabilities of detecting 90% of use areas.
+
+# Calculation is done assuming Binomial probability models, using functions
+# found in the 'dsftools' package.  Multiple versions of plots & tables were
+# constructed.
+
+
+
+
 library(dsftools)    # for detection probabilities
 library(tidyverse)   # for data manipulation
 library(patchwork)   # for plotting
@@ -8,6 +29,8 @@ library(patchwork)   # for plotting
 ninit <- 100         # number tagged
 surv_init <- 0.8     # initial survival post-tagging
 surv_annual <- 0.75  # annual survival
+
+write_results <- FALSE  ##### whether to write results to file!!
 
 
 
@@ -78,7 +101,9 @@ for(natleast in 1:2) {
                                                       prop_ofareas = 0.9,
                                                       model=model,
                                                       observe_at_least = natleast)$p_multipleareas)
-  write.csv(thetable, file=paste0("OP_2024/R_output/Table2_atleast", natleast, ".csv"))
+  if(write_results) {
+    write.csv(thetable, file=paste0("OP_2024/R_output/Table2_atleast", natleast, ".csv"))
+  }
 }
 
 
@@ -124,8 +149,9 @@ plot2 <- ptab_gplot %>%
 
 plot1 / plot2
 
-ggsave(plot = plot1 / plot2, filename="OP_2024/R_output/Figure4.png", height=8, width=8, units="in")
-
+if(write_results) {
+  ggsave(plot = plot1 / plot2, filename="OP_2024/R_output/Figure4.png", height=8, width=8, units="in")
+}
 
 
 
@@ -170,8 +196,9 @@ plot2 <- ptab_gplot %>%
 
 plot1 / plot2
 
-ggsave(plot = plot1 / plot2, filename="OP_2024/R_output/Figure4_just2fish.png", height=8, width=8, units="in")
-
+if(write_results) {
+  ggsave(plot = plot1 / plot2, filename="OP_2024/R_output/Figure4_just2fish.png", height=8, width=8, units="in")
+}
 
 
 ## Redoing the figure, simplifying to ONLY CONSIDER >= 2 FISH and ONLY 90% OF AREAS
@@ -215,7 +242,9 @@ plot2 <- ptab_gplot %>%
 
 plot1 / plot2
 
-ggsave(plot = plot1 / plot2, filename="OP_2024/R_output/Figure4_just2fish_just90.png", height=8, width=8, units="in")
+if(write_results) {
+  ggsave(plot = plot1 / plot2, filename="OP_2024/R_output/Figure4_just2fish_just90.png", height=8, width=8, units="in")
+}
 
 
 plot1 <- ptab_gplot %>%
@@ -235,8 +264,10 @@ plot1 <- ptab_gplot %>%
   scale_x_date(date_breaks = "3 months", date_labels =  "%b %Y") +
   theme_bw() +
   theme(text = element_text(family = "serif"))
-ggsave(plot = plot1, filename="OP_2024/R_output/Figure4_just2fish_just90_v2.png", height=6, width=8, units="in")
 
+if(write_results) {
+  ggsave(plot = plot1, filename="OP_2024/R_output/Figure4_just2fish_just90_v2.png", height=6, width=8, units="in")
+}
 
 
 # ## creating a dummy data set to ask for help in how to make the legend work!!
