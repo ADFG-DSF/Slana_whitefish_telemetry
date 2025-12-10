@@ -93,6 +93,39 @@ mosaicplot(t(raw_dirtable))
 # % in/outside of the lake by survey (probably nonmorts)
 # % in/outside of spawning area
 
+# figuring out which segments represent spawning area
+zoomtoseg(c(194,25), slanacopper1)
+# spawnsegs <- routelist(69, 135, slanacopper1)
+zoomtoseg(c(20,151), slanacopper1)
+spawnsegs <- unique(ptdata$seg)#[ptdata$Date=="2024-10-16"])
+takeout <- function(x, a) x[!(x %in% a)]
+spawnsegs <- takeout(spawnsegs, c(89,110,19,11,100,75,60,76,86,26,129,1,85,# 134,85,83,
+                                  12,146,57,22,25,68,108,28,122,118,39,39,66,
+                                  90,65,72,43,55,166,174))
+zoomtoseg(spawnsegs, slanacopper1)
+highlightseg(spawnsegs, slanacopper1, add=T)
+points(ptdata_akalbers)
+points(ptdata_akalbers[ptdata$Date=="2024-10-16",], pch=15, col=4)
+# plot(ptdata_akalbers, asp=1)
+points(ptdata_akalbers, col=ifelse(ptdata$seg %in% spawnsegs, 3, 2), pch=16)
+spawn <- (ptdata$seg %in% spawnsegs & ptdata$y > 1474700) |
+  (ptdata$seg==174 & ptdata$x > 517000)
+
+plot(slanacopper1)
+zoomtoseg(c(116,120), slanacopper1)
+zoomtoseg(c(162,196), slanacopper1)
+zoomtoseg(c(4,47), slanacopper1)
+points(ptdata_akalbers, pch=16, col=ifelse(spawn, 3, 2))
+
+table(ptdata$Date, spawn)
+ptdata$spawn <- spawn
+
+
+# # what happens if we trim the rivernetwork to points?
+# slanacopper1_trim <- trimtopoints(x=ptdata_akalbers[,1],
+#                                   y=ptdata_akalbers[,2],
+#                                   rivers=slanacopper1,
+#                                   method="snaproute")
 
 
 # questions:
