@@ -1,9 +1,17 @@
-library(riverdist)
-library(tidyverse)
+library(riverdist)   # for river network distance computation
+library(tidyverse)   # for data management
 
 
+#############################################
+#
+#  Data Import and Cleaning
+#
+#############################################
 
 
+## Initial loading and cleaning of the river shapefile. This is not reproducible,
+## unfortunately, and the resulting (slightly) simplified rivernetwork object is
+## loaded directly.
 
 # slanacopper0 <- line2network(path="FDS_2025/raw_data",
 #                              layer="SlanaCopper3",
@@ -14,13 +22,14 @@ library(tidyverse)
 # save(slanacopper1, file="FDS_2025/flat_data/slanacopper1.Rdata")
 load(file="FDS_2025/flat_data/slanacopper1.Rdata")
 
+
+## Loading and cleaning the location (point) data
 ptdata <- read.csv("FDS_2025/flat_data/GIS.csv") %>%
   select(Unique, Survey, Length, Sex, Date, Freq, Code, Fate, Latitude, Longitude) %>%
   filter(!is.na(Unique)) %>%
   mutate(Date=as.Date(Date, format="%m/%d/%Y"))
 
-# transform point data to river coords
-# make sure river is in alaska albers
+## transform point data to river coords
 ptdata_akalbers <- select(ptdata, c("Longitude","Latitude")) %>%
   sf::sf_project(pts=.,
                  to="+proj=aea +lat_1=55 +lat_2=65
@@ -30,16 +39,20 @@ ptdata_segvert <- xy2segvert(x=ptdata_akalbers[,1],
                              y=ptdata_akalbers[,2],
                              rivers=slanacopper1)
 
-
-# zoomtoseg(c(206,11), slanacopper1)#, empty=TRUE)
-# zoomtoseg(c(210,100), slanacopper1)#, empty=TRUE)
-# points(ptdata_akalbers)
-
+## bundling river location stuff into the original point data dataframe
 ptdata$seg <- ptdata_segvert$seg
 ptdata$vert <- ptdata_segvert$vert
 ptdata$x <- ptdata_akalbers[,1]
 ptdata$y <- ptdata_akalbers[,2]
 
+
+
+
+#############################################
+#
+#  Analyses from Operational Plan objectives
+#
+#############################################
 
 
 # 1.	net distance traveled between tracking events,
@@ -77,6 +90,9 @@ mosaicplot(t(raw_dirtable))
 
 # 3.	net distance traveled between presumed spawning, summering, and
 #     overwintering locations; and,
+
+
+
 # 4.	annual home range, defined as the distance between the furthest upstream
 #     and furthest downstream locations of individual fish over the course of a year.
 
@@ -100,17 +116,35 @@ by_indiv <- data.frame(n_surveys = rep(NA, length(unique(ptdata$Code))),
                        homerange = NA,
                        totaldist = NA)
 ptdataA <- subset(ptdata, Fate=="A")
-for(codei in sort(unique(ptdata$Code))) {
-  by_indiv$n_surveys[i] <- with(subset(ptdataA, Code==codei), length(unique(Survey)))
+codes <- sort(unique(ptdata$Code))
+
+cumuldist <- function(seg, vert, rivers) {
+  if(length(seg)==1) {
+    return(0)
+  } else {
+    dists <- rep(NA, length(seg)-1)
+    for(i in 2:length(seg)) {
+      dists[i-1] <- riverdistance(startseg=seg[i-1], endseg=seg[i],
+                                  startvert=vert[i-1], endvert=vert[i],
+                                  rivers=rivers)
+    }
+    return(sum(dists))
+  }
+}
+
+for(i in seq_along(codes)) {
+  by_indiv$n_surveys[i] <- with(subset(ptdataA, Code==codes[i]), length(unique(Survey)))
 
   if(by_indiv$n_surveys[i] > 1) {
-    by_indiv$homerange[i] <- with(subset(ptdataA, Code==codei),
+    by_indiv$homerange[i] <- with(subset(ptdataA, Code==codes[i]),
                                   homerange(seg=seg,
                                             vert=vert,
                                             rivers=slanacopper1))$ranges$range/1000
 
-    # this is where i would calculate the total distance for the subset codei
-    xx <- subset(ptdataA, Code==codei)
+    # this is where i would calculate the total distance for the subset codes[i]
+    xx <- subset(ptdataA, Code==codes[i])
+    xx <- xx[order(xx$Survey),]
+    by_indiv$totaldist[i] <- cumuldist(seg=xx$seg, vert=xx$vert, rivers=slanacopper1)/1000
   }
 }
 
@@ -157,7 +191,7 @@ zoomtoseg(c(194,25), slanacopper1)
 zoomtoseg(c(20,151), slanacopper1)
 spawnsegs <- unique(ptdata$seg)#[ptdata$Date=="2024-10-16"])
 takeout <- function(x, a) x[!(x %in% a)]
-spawnsegs <- takeout(spawnsegs, c(89,110,19,11,100,75,60,76,86,26,129,1,85,# 134,85,83,
+spawnsegs <- takeout(spawnsegs, c(89,110,19,11,100,75,60,76,86,26,129,1,85, 134, 121, 145, 217,#85,83,
                                   12,146,57,22,25,68,108,28,122,118,39,39,66,
                                   90,65,72,43,55,166,174))
 zoomtoseg(spawnsegs, slanacopper1)
@@ -169,12 +203,31 @@ points(ptdata_akalbers, col=ifelse(ptdata$seg %in% spawnsegs, 3, 2), pch=16)
 spawn <- (ptdata$seg %in% spawnsegs & ptdata$y > 1474700) |
   (ptdata$seg==174 & ptdata$x > 517000)
 
+
+
 plot(slanacopper1)
 zoomtoseg(c(116,120), slanacopper1)
 zoomtoseg(c(162,196), slanacopper1)
 zoomtoseg(c(4,47), slanacopper1)
 points(ptdata_akalbers, pch=16, col=ifelse(spawn, 3, 2))
 
+
+leaflet(ptdata) %>%
+  # addTiles() %>%
+  addProviderTiles("Esri.WorldImagery",
+  options=providerTileOptions(opacity=.7)) %>%
+  # addMarkers(lng= ~Longitude,
+  #            lat= ~Latitude) %>%
+  addCircles(lng= ~Longitude,
+             lat= ~Latitude,
+             label= ~Survey,
+             color= ~ifelse(spawn, "red", "blue"),
+             opacity = 1) #%>%
+  # addCircles(lng= ~Longitude[Date=="2024-10-16"],
+  #            lat= ~Latitude[Date=="2024-10-16"],
+  #            radius=3,
+  #            color="white",
+  #            opacity = 1)
 table(ptdata$Date, spawn)
 ptdata$spawn <- spawn
 
