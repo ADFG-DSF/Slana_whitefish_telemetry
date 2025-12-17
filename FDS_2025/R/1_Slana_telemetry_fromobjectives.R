@@ -46,6 +46,158 @@ ptdata$x <- ptdata_akalbers[,1]
 ptdata$y <- ptdata_akalbers[,2]
 
 
+## defining summering location as follows:
+## - use 7/22 survey if a location exists
+## - use 6/11 survey otherwise.
+summerseg <- ptdata %>%
+  filter(Date %in% c("2025-06-11","2025-07-22")) %>%
+  select(Code, Date, seg) %>%
+  pivot_wider(names_from = Date, values_from = seg) %>%
+  mutate(summerseg = ifelse(!is.na(`2025-07-22`), `2025-07-22`, `2025-06-11`))
+summervert <- ptdata %>%
+  filter(Date %in% c("2025-06-11","2025-07-22")) %>%
+  select(Code, Date, vert) %>%
+  pivot_wider(names_from = Date, values_from = vert) %>%
+  mutate(summervert = ifelse(!is.na(`2025-07-22`), `2025-07-22`, `2025-06-11`))
+summerFate <- ptdata %>%
+  filter(Date %in% c("2025-06-11","2025-07-22")) %>%
+  select(Code, Date, Fate) %>%
+  pivot_wider(names_from = Date, values_from = Fate) %>%
+  mutate(summerFate = ifelse(!is.na(`2025-07-22`), `2025-07-22`, `2025-06-11`))
+all(summerseg$Code==summervert$Code)
+all(summerFate$Code==summervert$Code)
+
+summer_segvert <- data.frame(Code=summerseg$Code,
+                             seg=summerseg$summerseg,
+                             vert=summervert$summervert,
+                             Fate=summerFate$summerFate,
+                             season="3 Summer")
+
+
+## now combining seasonal locations as a separate dataframe
+spawning_segvert <- ptdata %>%
+  filter(Date=="2024-10-16") %>%
+  select(Code, seg, vert, Fate) %>%
+  mutate(season="1 Spawning")
+winter_segvert <- ptdata %>%
+  filter(Date=="2025-03-17") %>%
+  select(Code, seg, vert, Fate) %>%
+  mutate(season="2 Winter")
+
+ptdata_byseason <- rbind(spawning_segvert,
+                         winter_segvert,
+                         summer_segvert)
+
+
+
+
+
+
+
+
+# % in/outside of the lake by survey (probably nonmorts)
+
+
+# is it maybe easier to look at points via leaflet??
+
+mapstuff <- FALSE # whether to draw maps to check assigments
+
+
+if(mapstuff) {
+  library(leaflet)
+  leaflet(ptdata) %>%
+    addTiles() %>%
+    # addProviderTiles("Esri.WorldImagery") %>%#,
+    # options=providerTileOptions(opacity=.5)) %>%
+    # addMarkers(lng= ~longitude,
+    #            lat= ~latitude,
+    #            label= ~unique_id...2)
+    addCircles(lng= ~Longitude,
+               lat= ~Latitude,
+               label= ~Survey,
+               color= ~ifelse(Date=="2024-10-16", "red", "blue"),
+               opacity = 1)
+  # color= ~rainbow(17)[as.numeric(as.factor(Survey))])
+
+
+
+  # figuring out which segments represent the lake
+  plot(slanacopper1)
+  zoomtoseg(c(110,43),slanacopper1)
+  points(ptdata_akalbers)
+  points(ptdata_akalbers[ptdata$Date=="2024-10-16",], pch=15, col=4)
+}
+
+lake <- ptdata$y > max(slanacopper1$lines[[65]][,2])
+
+if(mapstuff) {
+  zoomtoseg(c(110,181),slanacopper1)
+  points(ptdata_akalbers, pch=16, col=ifelse(lake, 3, 2))
+}
+ptdata$lake <- lake
+
+
+
+# % in/outside of spawning area
+
+if(mapstuff) {
+  # figuring out which segments represent spawning area
+  zoomtoseg(c(194,25), slanacopper1)
+  # spawnsegs <- routelist(69, 135, slanacopper1)
+  zoomtoseg(c(20,151), slanacopper1)
+}
+  spawnsegs <- unique(ptdata$seg)#[ptdata$Date=="2024-10-16"])
+  takeout <- function(x, a) x[!(x %in% a)]
+  spawnsegs <- takeout(spawnsegs, c(89,110,19,11,100,75,60,76,86,26,129,1,85, 134, 121, 145, 217,#85,83,
+                                    12,146,57,22,25,68,108,28,122,118,39,39,66,
+                                    90,65,72,43,55,166,174))
+if(mapstuff) {
+  zoomtoseg(spawnsegs, slanacopper1)
+  highlightseg(spawnsegs, slanacopper1, add=T)
+  points(ptdata_akalbers)
+  points(ptdata_akalbers[ptdata$Date=="2024-10-16",], pch=15, col=4)
+  # plot(ptdata_akalbers, asp=1)
+  points(ptdata_akalbers, col=ifelse(ptdata$seg %in% spawnsegs, 3, 2), pch=16)
+}
+spawn <- (ptdata$seg %in% spawnsegs & ptdata$y > 1474700) |
+  (ptdata$seg==174 & ptdata$x > 517000)
+
+
+if(mapstuff) {
+  plot(slanacopper1)
+  zoomtoseg(c(116,120), slanacopper1)
+  zoomtoseg(c(162,196), slanacopper1)
+  zoomtoseg(c(4,47), slanacopper1)
+  points(ptdata_akalbers, pch=16, col=ifelse(spawn, 3, 2))
+
+
+  leaflet(ptdata) %>%
+    # addTiles() %>%
+    addProviderTiles("Esri.WorldImagery",
+                     options=providerTileOptions(opacity=.7)) %>%
+    # addMarkers(lng= ~Longitude,
+    #            lat= ~Latitude) %>%
+    addCircles(lng= ~Longitude,
+               lat= ~Latitude,
+               label= ~Survey,
+               color= ~ifelse(spawn, "red", "blue"),
+               opacity = 1) #%>%
+  # addCircles(lng= ~Longitude[Date=="2024-10-16"],
+  #            lat= ~Latitude[Date=="2024-10-16"],
+  #            radius=3,
+  #            color="white",
+  #            opacity = 1)
+  table(ptdata$Date, spawn)
+}
+ptdata$spawn <- spawn
+
+
+
+
+## defining new data frame(s) as SUBSET THAT IS ALIVE
+ptdataA <- subset(ptdata, Fate=="A")
+ptdata_byseasonA <- subset(ptdata_byseason, Fate=="A")
+
 
 
 #############################################
@@ -63,7 +215,7 @@ ptdata$y <- ptdata_akalbers[,2]
 #                                       rivers=slanacopper1))/1000
 
 # subset of fish that are Alive
-distance_seq <- with(subset(ptdata, Fate=="A"),
+distance_seq <- with(ptdataA,
                      riverdistanceseq(unique=Code,
                                       seg=seg, vert=vert,
                                       survey=Survey,
@@ -78,7 +230,7 @@ distance_seq <- with(subset(ptdata, Fate=="A"),
 #                                         rivers=slanacopper1))
 
 # subset of fish that are Alive
-direction_seq <- with(subset(ptdata, Fate=="A"),
+direction_seq <- with(ptdataA,
                       riverdirectionseq(unique=Code,
                                         seg=seg, vert=vert,
                                         survey=Survey,
@@ -90,32 +242,36 @@ mosaicplot(t(raw_dirtable))
 
 # 3.	net distance traveled between presumed spawning, summering, and
 #     overwintering locations; and,
-
+distance_seq_byseason <- with(ptdata_byseasonA,
+                     riverdistanceseq(unique=Code,
+                                      seg=seg, vert=vert,
+                                      survey=season,
+                                      rivers=slanacopper1))/1000
 
 
 # 4.	annual home range, defined as the distance between the furthest upstream
 #     and furthest downstream locations of individual fish over the course of a year.
 
-# FIGURE OUT WHICH IS APPROPRIATE
-hr <- with(ptdata,
+# hr <- with(ptdata,
+#            homerange(unique = Code,
+#                      survey = Date,
+#                      seg = seg,
+#                      vert = vert,
+#                      rivers = slanacopper1))
+hr <- with(ptdataA,
            homerange(unique = Code,
                      survey = Date,
                      seg = seg,
                      vert = vert,
                      rivers = slanacopper1))
-hr <- with(subset(ptdata, Fate=="A"),
-           homerange(unique = Code,
-                     survey = Date,
-                     seg = seg,
-                     vert = vert,
-                     rivers = slanacopper1))
-hr$ranges/1000 ## this is what will be applicable
+hr$ranges$range <- hr$ranges$range/1000
+hr$ranges  ## this is what will be applicable
 ### also calculate total observed distance moved (and maybe add this to riverdist)
 
 by_indiv <- data.frame(n_surveys = rep(NA, length(unique(ptdata$Code))),
                        homerange = NA,
                        totaldist = NA)
-ptdataA <- subset(ptdata, Fate=="A")
+
 codes <- sort(unique(ptdata$Code))
 
 cumuldist <- function(seg, vert, rivers) {
@@ -148,104 +304,53 @@ for(i in seq_along(codes)) {
   }
 }
 
+se_thing <- function(x1, x2, digs=2) {
+  phat <- x1/(x1+x2)
+  se_phat <- sqrt(phat*(1-phat)/(x1+x2-1))
+  paste0(formatC(phat, digits=digs, format="f"), " (",
+         formatC(se_phat, digits=digs, format="f"), ")")
+}
+
+by_indiv0 <- by_indiv
+
+by_indiv <- by_indiv0 %>%
+  mutate(inside_lake = with(ptdataA, table(Code, lake))[,2]) %>%
+  mutate(outside_lake = with(ptdataA, table(Code, lake))[,1]) %>%
+  mutate(p_lake = se_thing(inside_lake, outside_lake)) %>%
+  mutate(inside_spawnarea = with(ptdataA, table(Code, spawn))[,2]) %>%
+  mutate(outside_spawnarea = with(ptdataA, table(Code, spawn))[,1]) %>%
+  mutate(p_spawnarea = se_thing(inside_spawnarea, outside_spawnarea))
+
+##### should the inside/outside stuff include tagging???
 
 
 
-# % in/outside of the lake by survey (probably nonmorts)
-
-
-# is it maybe easier to look at points via leaflet??
-library(leaflet)
-leaflet(ptdata) %>%
-  addTiles() %>%
-  # addProviderTiles("Esri.WorldImagery") %>%#,
-                   # options=providerTileOptions(opacity=.5)) %>%
-  # addMarkers(lng= ~longitude,
-  #            lat= ~latitude,
-  #            label= ~unique_id...2)
-  addCircles(lng= ~Longitude,
-             lat= ~Latitude,
-             label= ~Survey,
-             color= ~ifelse(Date=="2024-10-16", "red", "blue"),
-             opacity = 1)
-             # color= ~rainbow(17)[as.numeric(as.factor(Survey))])
+# table by survey
+by_survey <- data.frame(#Date=rownames(with(ptdataA, table(Date, lake))),
+                        inside_lake = with(ptdataA, table(Date, lake)[,2])) %>%
+  mutate(outside_lake = with(ptdataA, table(Date, lake)[,1])) %>%
+  mutate(p_lake = se_thing(inside_lake, outside_lake)) %>%
+  mutate(inside_spawnarea = with(ptdataA, table(Date, spawn)[,2])) %>%
+  mutate(outside_spawnarea = with(ptdataA, table(Date, spawn)[,1])) %>%
+  mutate(p_spawnarea = se_thing(inside_spawnarea, outside_spawnarea))
 
 
 
-# figuring out which segments represent the lake
-plot(slanacopper1)
-zoomtoseg(c(110,43),slanacopper1)
-points(ptdata_akalbers)
-points(ptdata_akalbers[ptdata$Date=="2024-10-16",], pch=15, col=4)
-lake <- ptdata$y > max(slanacopper1$lines[[65]][,2])
+## outputs from this script
+distance_seq
+direction_seq
+distance_seq_byseason
+by_indiv
+by_survey
 
-zoomtoseg(c(110,181),slanacopper1)
-points(ptdata_akalbers, pch=16, col=ifelse(lake, 3, 2))
-ptdata$lake <- lake
-
-# % in/outside of spawning area
-
-# figuring out which segments represent spawning area
-zoomtoseg(c(194,25), slanacopper1)
-# spawnsegs <- routelist(69, 135, slanacopper1)
-zoomtoseg(c(20,151), slanacopper1)
-spawnsegs <- unique(ptdata$seg)#[ptdata$Date=="2024-10-16"])
-takeout <- function(x, a) x[!(x %in% a)]
-spawnsegs <- takeout(spawnsegs, c(89,110,19,11,100,75,60,76,86,26,129,1,85, 134, 121, 145, 217,#85,83,
-                                  12,146,57,22,25,68,108,28,122,118,39,39,66,
-                                  90,65,72,43,55,166,174))
-zoomtoseg(spawnsegs, slanacopper1)
-highlightseg(spawnsegs, slanacopper1, add=T)
-points(ptdata_akalbers)
-points(ptdata_akalbers[ptdata$Date=="2024-10-16",], pch=15, col=4)
-# plot(ptdata_akalbers, asp=1)
-points(ptdata_akalbers, col=ifelse(ptdata$seg %in% spawnsegs, 3, 2), pch=16)
-spawn <- (ptdata$seg %in% spawnsegs & ptdata$y > 1474700) |
-  (ptdata$seg==174 & ptdata$x > 517000)
+## things that a future script might use (can also just source this script)
+ptdata
+ptdataA
+ptdata_byseason
+ptdata_byseasonA
 
 
 
-plot(slanacopper1)
-zoomtoseg(c(116,120), slanacopper1)
-zoomtoseg(c(162,196), slanacopper1)
-zoomtoseg(c(4,47), slanacopper1)
-points(ptdata_akalbers, pch=16, col=ifelse(spawn, 3, 2))
-
-
-leaflet(ptdata) %>%
-  # addTiles() %>%
-  addProviderTiles("Esri.WorldImagery",
-  options=providerTileOptions(opacity=.7)) %>%
-  # addMarkers(lng= ~Longitude,
-  #            lat= ~Latitude) %>%
-  addCircles(lng= ~Longitude,
-             lat= ~Latitude,
-             label= ~Survey,
-             color= ~ifelse(spawn, "red", "blue"),
-             opacity = 1) #%>%
-  # addCircles(lng= ~Longitude[Date=="2024-10-16"],
-  #            lat= ~Latitude[Date=="2024-10-16"],
-  #            radius=3,
-  #            color="white",
-  #            opacity = 1)
-table(ptdata$Date, spawn)
-ptdata$spawn <- spawn
-
-
-# # what happens if we trim the rivernetwork to points?
-# slanacopper1_trim <- trimtopoints(x=ptdata_akalbers[,1],
-#                                   y=ptdata_akalbers[,2],
-#                                   rivers=slanacopper1,
-#                                   method="snaproute")
-
-
-tracker <- read.csv("FDS_2025/flat_data/tracker.csv")[1:100,]
-with(tracker, table(X6.11.2025, X7.22.2025))
-
-# questions:
-# - can I actually interpret the A/M in the GIS table as alive/mort?
-# - are there specific surveys I should consider spawning/summering/overwintering?
-# - how is spawning area defined?
 
 
 # ideas:
