@@ -325,6 +325,13 @@ by_indiv <- by_indiv0 %>%
 
 
 
+##### need to make two by-individual tables for homerange and cumulative distance,
+##### each row is a fish, each column is a survey, and they extend UP TO that survey
+
+
+
+
+
 # table by survey
 by_survey <- data.frame(#Date=rownames(with(ptdataA, table(Date, lake))),
                         inside_lake = with(ptdataA, table(Date, lake)[,2])) %>%

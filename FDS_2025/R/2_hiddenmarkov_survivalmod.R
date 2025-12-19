@@ -44,7 +44,7 @@ cat('model {
   }
 
   for(j in 1:nj) {
-    p[j] ~ dbeta(1, 1)
+    p[j] ~ dbeta(0.5, 0.5)
   }
 
 }', file=hm_jags)
@@ -82,17 +82,25 @@ dates <- c("10/16/2024", "10/24/2024", "11/1/2024",  "12/27/2024", "3/17/2025", 
            "10/29/2025")
 
 caterpillar(hm_jags_out, "p", xax=dates)
-caterpillar(hm_jags_out, "p", xax=dates, las=2)
+parmar <- par("mar")
+par(mar=parmar + c(1,0,0,0))
+caterpillar(hm_jags_out, "p", xax=dates, las=2, main="Survival probability")
+par(mar=parmar)
 
 thetab <- apply(Y, 2, table, useNA='ifany')
 colnames(thetab) <- dates
 thetab
 
 modsurv <- hm_jags_out$mean$Y
-plot(NA, xlim=c(1, ncol(Y)), ylim=c(0, 1))
+par(mar=parmar + c(1,0,0,0))
+plot(NA, xlim=c(1, ncol(Y)), ylim=c(0, 1), xaxt='n', ylab="Modeled survival", xlab="")
+axis(side=1, at=seq_along(dates), labels=dates, las=2)
 for(i in 1:nrow(Y)) {
   lines(jitter(modsurv[i,], 0.1), col=adjustcolor(1, alpha.f=.4))
 }
+points(colMeans(modsurv), pch=16)
+lines(colMeans(modsurv), lty=2, lwd=3)
+par(mar=parmar)
 
 cumulsurv <- NA*hm_jags_out$sims.list$p
 for(j in 1:ncol(cumulsurv)) {
@@ -100,5 +108,29 @@ for(j in 1:ncol(cumulsurv)) {
     cumulsurv[i,j] <- prod(hm_jags_out$sims.list$p[i, 1:j])
   }
 }
-caterpillar(cumulsurv)
-points(thetab[2,]/colSums(thetab[1:2,]))
+par(mar=parmar + c(1,0,0,0))
+caterpillar(cumulsurv, xax=dates, las=2, main="Cumulative survival probability")
+# points(thetab[2,]/colSums(thetab[1:2,]))
+par(mar=parmar)
+
+plotcor_jags(hm_jags_out, p="p")
+
+
+# and what if we don't go hidden markov-y and just estimate from each pair of surveys
+Y1 <- cbind(1,Y)
+Ylist <- list()
+for(i in 1:ncol(Y)) {
+  Ylist[[i]] <- table(factor(Y1[,i], levels=0:1),
+                      factor(Y1[,i+1], levels=0:1),
+                      useNA='always')
+}
+propest <- sapply(Ylist, \(x) x[2,2]/sum(x[2,1:2]))
+caterpillar(hm_jags_out, "p", xax=dates)
+points(propest, pch="x")
+bp <- 0.5  # beta prior hyperparams
+betalo <- sapply(Ylist, \(x) qbeta(0.025, x[2,2]+bp, x[2,1]+bp))
+betahi <- sapply(Ylist, \(x) qbeta(0.975, x[2,2]+bp, x[2,1]+bp))
+betamid <- sapply(Ylist, \(x) qbeta(0.5, x[2,2]+bp, x[2,1]+bp))
+points(betalo, pch="-")
+points(betahi, pch="-")
+points(betamid)
