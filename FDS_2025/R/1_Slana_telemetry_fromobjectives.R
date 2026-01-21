@@ -67,14 +67,14 @@ summerFate <- ptdata %>%
 all(summerseg$Code==summervert$Code)
 all(summerFate$Code==summervert$Code)
 
+
+
+## now combining seasonal locations as a separate dataframe
 summer_segvert <- data.frame(Code=summerseg$Code,
                              seg=summerseg$summerseg,
                              vert=summervert$summervert,
                              Fate=summerFate$summerFate,
                              season="3 Summer")
-
-
-## now combining seasonal locations as a separate dataframe
 spawning_segvert <- ptdata %>%
   filter(Date=="2024-10-16") %>%
   select(Code, seg, vert, Fate) %>%
@@ -288,6 +288,7 @@ cumuldist <- function(seg, vert, rivers) {
   }
 }
 
+### populating by_indiv with the homerange and total cumulative distance for ALL SURVEYS
 for(i in seq_along(codes)) {
   by_indiv$n_surveys[i] <- with(subset(ptdataA, Code==codes[i]), length(unique(Survey)))
 
@@ -304,6 +305,46 @@ for(i in seq_along(codes)) {
   }
 }
 
+
+
+### defining homerange and cumulative distance ENDING AT EACH SURVEY
+surveys <- sort(unique(ptdata$Survey))
+homerange_byindiv_bysurvey <-
+  totaldist_byindiv_bysurvey <-
+  matrix(nrow=length(codes), ncol=length(surveys)-1)
+for(j in 1:max(surveys)) { # we do not want Survey 0
+  for(i in seq_along(codes)) {
+    n_surveys <- with(subset(ptdataA, Code==codes[i] & Survey<=j), length(unique(Survey)))
+    is_there <- any(ptdataA$Code==codes[i] & ptdataA$Survey==j)
+
+
+    # if(is_there) {      #### this only makes entries if an individual is observed
+    if(n_surveys > 1) {   #### this is fully cumulative
+
+      homerange_byindiv_bysurvey[i,j] <- with(subset(ptdataA, Code==codes[i] & Survey<=j),
+                                    homerange(seg=seg,
+                                              vert=vert,
+                                              rivers=slanacopper1))$ranges$range/1000
+
+      # this is where i would calculate the total distance for the subset codes[i]
+      xx <- subset(ptdataA, Code==codes[i] & Survey<=j)
+      xx <- xx[order(xx$Survey),]
+      totaldist_byindiv_bysurvey[i,j] <- cumuldist(seg=xx$seg, vert=xx$vert, rivers=slanacopper1)/1000
+    }
+  }
+}
+####### FIGURE OUT HOW TO CHECK THIS!!!!
+
+plotseq(homerange_byindiv_bysurvey, type="dotline")
+lines(colMeans(homerange_byindiv_bysurvey, na.rm=TRUE), lwd=3, lty=2)
+
+plotseq(totaldist_byindiv_bysurvey, type="dotline")
+lines(colMeans(totaldist_byindiv_bysurvey, na.rm=TRUE), lwd=3, lty=2)
+
+
+
+
+### adding proportions & SE's inside/outside lake & spawning area to by_indiv
 se_thing <- function(x1, x2, digs=2) {
   phat <- x1/(x1+x2)
   se_phat <- sqrt(phat*(1-phat)/(x1+x2-1))
