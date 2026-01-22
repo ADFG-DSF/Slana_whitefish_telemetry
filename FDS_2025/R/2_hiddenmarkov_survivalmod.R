@@ -18,6 +18,7 @@ for(j in 1:ncol(tracker)) {
   Y[,j] <- ifelse(tracker[,j]=="A", 1,
                       ifelse(tracker[,j]=="M", 0, NA))
 }
+Yraw <- Y
 
 for(i in 1:nrow(Y)) {
   for(j in 1:ncol(Y)) {
@@ -209,7 +210,7 @@ lake_mat_df <- ptdata %>%
   mutate(Code = factor(Code)) %>%
   filter(Survey >= 1) %>%
   pivot_wider(names_from = Survey, values_from = lake, id_expand = T) %>% data.frame
-lake_mat <- as.matrix(lake_fate_df[,-1])*1
+lake_mat <- as.matrix(lake_mat_df[,-1])*1
 for(i in 1:nrow(lake_mat)) {  # this is a terrible kludge
   if(is.na(lake_mat[i,1])) {
     lake_mat[i,1] <- floor(median(lake_mat[i,], na.rm=TRUE))
@@ -270,3 +271,67 @@ plotdens(hm_jags_byindiv_out, "bDist")
 abline(v=0, lty=2)
 plotdens(hm_jags_byindiv_out, "bLake")
 abline(v=0, lty=2)
+
+
+
+# specify model, which is written to a temporary file
+hm_jags_detect <- tempfile()
+cat('model {
+  for(i in 1:ni) {
+    Y[i,1] ~ dbin(phi[lake[i,1]+1, 1], 1)
+    X[i,1] ~ dbin(p[lake[i,1]+1, Y[i,1]+1], 1)
+    for(j in 2:whichlast[i]) {#
+      Y[i,j] ~ dbin(phi[lake[i,j]+1, j], Y[i, j-1])
+      X[i,j] ~ dbin(p[lake[i,j]+1, Y[i,j]+1], 1)
+    }
+  }
+
+  for(ip in 1:2) {
+    for(jp in 1:2) {
+      p[ip,jp] ~ dbeta(1,1)
+    }
+  }
+
+  for(iphi in 1:2) {
+    for(jphi in 1:nj) {
+      phi[iphi,jphi] ~ dbeta(1,1)
+    }
+  }
+
+}', file=hm_jags_detect)
+
+whichrows <- rowSums(!is.na(Y)) > 1 & !is.na(by_indiv$homerange)
+
+Y1 <- Y[whichrows,]
+cc <- function(x) x - mean(x, na.rm=TRUE)
+hm_data <- list(Y = Y1,
+                X = 1*(!is.na(Yraw[whichrows,])),
+                lake = lake_mat[whichrows,],
+                whichlast = apply(Y1, 1, \(x) max(which(!is.na(x)))),
+                ni = nrow(Y1),
+                nj = ncol(Y1))
+
+# JAGS controls
+niter <- 10000
+# ncores <- 3
+ncores <- 8# min(10, parallel::detectCores()-1)
+
+{
+  tstart <- Sys.time()
+  print(tstart)
+  hm_jags_detect_out <- jagsUI::jags(model.file=hm_jags_detect, data=hm_data,
+                                      parameters.to.save=c("Y", "p", "phi"),
+                                      n.chains=ncores, parallel=T, n.iter=niter,
+                                      n.burnin=niter/2, n.thin=niter/2000)
+  print(Sys.time() - tstart)
+}
+
+nbyname(hm_jags_detect_out)
+plotRhats(hm_jags_detect_out)
+traceworstRhat(hm_jags_detect_out, parmfrow = c(2,2))
+
+par(mfrow=c(1,1))
+caterpillar(hm_jags_detect_out, "phi", row=1, ylim=0:1)
+caterpillar(hm_jags_detect_out, "phi", row=2, x=1:13+.2, col=2, add=T)
+caterpillar(hm_jags_detect_out, "p", row=1, ylim=0:1)
+caterpillar(hm_jags_detect_out, "p", row=2, x=1:2+.2, col=2, add=T)
