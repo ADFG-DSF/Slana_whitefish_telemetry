@@ -209,14 +209,14 @@ ptdata_byseasonA <- subset(ptdata_byseason, Fate=="A")
 
 # 1.	net distance traveled between tracking events,
 # distance_seq <- with(ptdata,
-#                      riverdistanceseq(unique=Code,
+#                      upstreamseq(unique=Code,
 #                                       seg=seg, vert=vert,
 #                                       survey=Survey,
 #                                       rivers=slanacopper1))/1000
 
 # subset of fish that are Alive
 distance_seq <- with(ptdataA,
-                     riverdistanceseq(unique=Code,
+                     upstreamseq(unique=Code,
                                       seg=seg, vert=vert,
                                       survey=Survey,
                                       rivers=slanacopper1))/1000
@@ -243,7 +243,7 @@ mosaicplot(t(raw_dirtable))
 # 3.	net distance traveled between presumed spawning, summering, and
 #     overwintering locations; and,
 distance_seq_byseason <- with(ptdata_byseasonA,
-                     riverdistanceseq(unique=Code,
+                              upstreamseq(unique=Code,
                                       seg=seg, vert=vert,
                                       survey=season,
                                       rivers=slanacopper1))/1000
@@ -311,6 +311,8 @@ for(i in seq_along(codes)) {
 surveys <- sort(unique(ptdata$Survey))
 homerange_byindiv_bysurvey <-
   totaldist_byindiv_bysurvey <-
+  homerange_byindiv_bysurvey_fullycum <-
+  totaldist_byindiv_bysurvey_fullycum <-
   matrix(nrow=length(codes), ncol=length(surveys)-1)
 for(j in 1:max(surveys)) { # we do not want Survey 0
   for(i in seq_along(codes)) {
@@ -318,18 +320,31 @@ for(j in 1:max(surveys)) { # we do not want Survey 0
     is_there <- any(ptdataA$Code==codes[i] & ptdataA$Survey==j)
 
 
-    # if(is_there) {      #### this only makes entries if an individual is observed
-    if(n_surveys > 1) {   #### this is fully cumulative
+    if(is_there) {      #### this only makes entries if an individual is observed
+      # if(n_surveys > 1) {   #### this is fully cumulative
 
       homerange_byindiv_bysurvey[i,j] <- with(subset(ptdataA, Code==codes[i] & Survey<=j),
-                                    homerange(seg=seg,
-                                              vert=vert,
-                                              rivers=slanacopper1))$ranges$range/1000
+                                              homerange(seg=seg,
+                                                        vert=vert,
+                                                        rivers=slanacopper1))$ranges$range/1000
 
       # this is where i would calculate the total distance for the subset codes[i]
       xx <- subset(ptdataA, Code==codes[i] & Survey<=j)
       xx <- xx[order(xx$Survey),]
       totaldist_byindiv_bysurvey[i,j] <- cumuldist(seg=xx$seg, vert=xx$vert, rivers=slanacopper1)/1000
+    }
+    # if(is_there) {      #### this only makes entries if an individual is observed
+    if(n_surveys > 1) {   #### this is fully cumulative
+
+      homerange_byindiv_bysurvey_fullycum[i,j] <- with(subset(ptdataA, Code==codes[i] & Survey<=j),
+                                              homerange(seg=seg,
+                                                        vert=vert,
+                                                        rivers=slanacopper1))$ranges$range/1000
+
+      # this is where i would calculate the total distance for the subset codes[i]
+      xx <- subset(ptdataA, Code==codes[i] & Survey<=j)
+      xx <- xx[order(xx$Survey),]
+      totaldist_byindiv_bysurvey_fullycum[i,j] <- cumuldist(seg=xx$seg, vert=xx$vert, rivers=slanacopper1)/1000
     }
   }
 }
@@ -338,8 +353,14 @@ for(j in 1:max(surveys)) { # we do not want Survey 0
 plotseq(homerange_byindiv_bysurvey, type="dotline")
 lines(colMeans(homerange_byindiv_bysurvey, na.rm=TRUE), lwd=3, lty=2)
 
+plotseq(homerange_byindiv_bysurvey_fullycum, type="dotline")
+lines(colMeans(homerange_byindiv_bysurvey_fullycum, na.rm=TRUE), lwd=3, lty=2)
+
 plotseq(totaldist_byindiv_bysurvey, type="dotline")
 lines(colMeans(totaldist_byindiv_bysurvey, na.rm=TRUE), lwd=3, lty=2)
+
+plotseq(totaldist_byindiv_bysurvey_fullycum, type="dotline")
+lines(colMeans(totaldist_byindiv_bysurvey_fullycum, na.rm=TRUE), lwd=3, lty=2)
 
 
 
@@ -384,18 +405,37 @@ by_survey <- data.frame(#Date=rownames(with(ptdataA, table(Date, lake))),
 
 
 
-## outputs from this script
-distance_seq
-direction_seq
-distance_seq_byseason
-by_indiv
-by_survey
+# ## outputs from this script
+# distance_seq
+# direction_seq
+# distance_seq_byseason
+# by_indiv
+# by_survey
+# homerange_byindiv_bysurvey
+# totaldist_byindiv_bysurvey_fullycum
 
-## things that a future script might use (can also just source this script)
-ptdata
-ptdataA
-ptdata_byseason
-ptdata_byseasonA
+
+
+# ## writing these to an external file
+# ## COMMENTED OUT BECAUSE THIS SCRIPT IS source()'d elsewhere
+#
+# write.csv(distance_seq, file="FDS_2025/output_tables/distance_seq.csv")
+# write.csv(direction_seq, file="FDS_2025/output_tables/direction_seq.csv")
+# write.csv(distance_seq_byseason, file="FDS_2025/output_tables/distance_seq_byseason.csv")
+# write.csv(by_indiv, file="FDS_2025/output_tables/by_indiv.csv")
+# write.csv(by_survey, file="FDS_2025/output_tables/by_survey.csv")
+# write.csv(homerange_byindiv_bysurvey, file="FDS_2025/output_tables/homerange_byindiv_bysurvey.csv")
+# write.csv(totaldist_byindiv_bysurvey_fullycum, file="FDS_2025/output_tables/totaldist_byindiv_bysurvey_fullycum.csv")
+# write.csv(ptdata, file="FDS_2025/output_tables/ptdata.csv")
+
+
+
+
+# ## things that a future script might use (can also just source this script)
+# ptdata
+# ptdataA
+# ptdata_byseason
+# ptdata_byseasonA
 
 
 

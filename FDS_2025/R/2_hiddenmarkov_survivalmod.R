@@ -288,15 +288,19 @@ cat('model {
 
   for(ip in 1:2) {
     for(jp in 1:2) {
-      p[ip,jp] ~ dbeta(1,1)
+      p[ip,jp] ~ dbeta(0.5, 0.5)
     }
   }
 
   for(iphi in 1:2) {
     for(jphi in 1:nj) {
-      phi[iphi,jphi] ~ dbeta(1,1)
+      phi[iphi,jphi] ~ dbeta(0.5, 0.5)
     }
   }
+  pvec[1] <- p[1,1]
+  pvec[2] <- p[1,2]
+  pvec[3] <- p[2,1]
+  pvec[4] <- p[2,2]
 
 }', file=hm_jags_detect)
 
@@ -312,7 +316,7 @@ hm_data <- list(Y = Y1,
                 nj = ncol(Y1))
 
 # JAGS controls
-niter <- 10000
+niter <- 50000
 # ncores <- 3
 ncores <- 8# min(10, parallel::detectCores()-1)
 
@@ -320,7 +324,7 @@ ncores <- 8# min(10, parallel::detectCores()-1)
   tstart <- Sys.time()
   print(tstart)
   hm_jags_detect_out <- jagsUI::jags(model.file=hm_jags_detect, data=hm_data,
-                                      parameters.to.save=c("Y", "p", "phi"),
+                                      parameters.to.save=c("Y", "p", "phi","pvec"),
                                       n.chains=ncores, parallel=T, n.iter=niter,
                                       n.burnin=niter/2, n.thin=niter/2000)
   print(Sys.time() - tstart)
@@ -331,7 +335,98 @@ plotRhats(hm_jags_detect_out)
 traceworstRhat(hm_jags_detect_out, parmfrow = c(2,2))
 
 par(mfrow=c(1,1))
-caterpillar(hm_jags_detect_out, "phi", row=1, ylim=0:1)
+par(mar=c(6,4,4,1))
+caterpillar(hm_jags_detect_out, "phi", row=1,
+            ylim=0:1, xax=dates, las=2,
+            main="Survival Probability")
 caterpillar(hm_jags_detect_out, "phi", row=2, x=1:13+.2, col=2, add=T)
-caterpillar(hm_jags_detect_out, "p", row=1, ylim=0:1)
-caterpillar(hm_jags_detect_out, "p", row=2, x=1:2+.2, col=2, add=T)
+# lines(y=hm_jags_detect_out$q50$phi[1,], col=adjustcolor(4, alpha.f=.5), x=1:13, lwd=2)
+# lines(y=hm_jags_detect_out$q50$phi[2,], col=adjustcolor(2, alpha.f=.5), x=1:13+.2, lwd=2)
+legend("bottomleft", legend=c("River", "Lake"), col=c(4,2), lwd=3)
+par(mar=parmar)
+
+
+# checking to see if the data support inferences
+str(hm_data)
+
+# Y is survival
+# X is detection
+# lake is lake
+lakemat <- rivermat <- matrix(nrow=5, ncol=13)
+rownames(lakemat) <- rownames(rivermat) <- c("Alive_Detected", "Alive_NotDetected","Died_Detected", "Died_Prev","MIA")
+lakemat[1,1] <- sum((hm_data$lake[,1]==1) & (hm_data$Y[,1]==1) & (hm_data$X[,1]==1), na.rm=TRUE)
+lakemat[2,1] <- sum((hm_data$lake[,1]==1) & (hm_data$Y[,1]==1) & (hm_data$X[,1]==0), na.rm=TRUE)
+lakemat[3,1] <- sum((hm_data$lake[,1]==1) & (hm_data$Y[,1]==0) & (hm_data$X[,1]==1), na.rm=TRUE)
+lakemat[4,1] <- 0
+lakemat[5,1] <- sum((hm_data$lake[,1]==1) & is.na(hm_data$Y[,1]) & (hm_data$X[,1]==0), na.rm=TRUE)
+for(j in 2:13) {
+  lakemat[1,j] <- sum((hm_data$lake[,j]==1) & (hm_data$Y[,j]==1) & (hm_data$X[,j]==1), na.rm=TRUE)
+  lakemat[2,j] <- sum((hm_data$lake[,j]==1) & (hm_data$Y[,j]==1) & (hm_data$X[,j]==0), na.rm=TRUE)
+  lakemat[3,j] <- sum((hm_data$lake[,j]==1) & (hm_data$Y[,j]==0) & (hm_data$Y[,j-1]==1) & (hm_data$X[,j]==1), na.rm=TRUE)
+  lakemat[4,j] <- sum((hm_data$lake[,j]==1) & (hm_data$Y[,j-1]==0), na.rm=TRUE)
+  lakemat[5,j] <- sum((hm_data$lake[,j]==1) & is.na(hm_data$Y[,j]) & (hm_data$X[,j]==0), na.rm=TRUE)
+}
+rivermat[1,1] <- sum((hm_data$lake[,1]==0) & (hm_data$Y[,1]==1) & (hm_data$X[,1]==1), na.rm=TRUE)
+rivermat[2,1] <- sum((hm_data$lake[,1]==0) & (hm_data$Y[,1]==1) & (hm_data$X[,1]==0), na.rm=TRUE)
+rivermat[3,1] <- sum((hm_data$lake[,1]==0) & (hm_data$Y[,1]==0) & (hm_data$X[,1]==1), na.rm=TRUE)
+rivermat[4,1] <- 0
+rivermat[5,1] <- sum((hm_data$lake[,1]==0) & is.na(hm_data$Y[,1]) & (hm_data$X[,1]==0), na.rm=TRUE)
+for(j in 2:13) {
+  rivermat[1,j] <- sum((hm_data$lake[,j]==0) & (hm_data$Y[,j]==1) & (hm_data$X[,j]==1), na.rm=TRUE)
+  rivermat[2,j] <- sum((hm_data$lake[,j]==0) & (hm_data$Y[,j]==1) & (hm_data$X[,j]==0), na.rm=TRUE)
+  rivermat[3,j] <- sum((hm_data$lake[,j]==0) & (hm_data$Y[,j]==0) & (hm_data$Y[,j-1]==1) & (hm_data$X[,j]==1), na.rm=TRUE)
+  rivermat[4,j] <- sum((hm_data$lake[,j]==0) & (hm_data$Y[,j-1]==0), na.rm=TRUE)
+  rivermat[5,j] <- sum((hm_data$lake[,j]==0) & is.na(hm_data$Y[,j]) & (hm_data$X[,j]==0), na.rm=TRUE)
+}
+lakemat
+rivermat
+colSums(lakemat+rivermat)
+
+xlake <- colSums(lakemat[1:2,])
+nlake <- colSums(lakemat[1:3,])
+plake <- xlake/nlake
+se_plake <- sqrt(plake*(1-plake)/(nlake-1))
+
+xriver <- colSums(rivermat[1:2,])
+nriver <- colSums(rivermat[1:3,])
+priver <- xriver/nriver
+se_priver <- sqrt(priver*(1-priver)/(nriver-1))
+
+
+
+# make that last plot again, for the purpose of adding check points
+par(mfrow=c(1,1))
+par(mar=c(6,4,4,1))
+caterpillar(hm_jags_detect_out, "phi", row=1,
+            ylim=0:1, xax=dates, las=2,
+            main="Survival Probability")
+caterpillar(hm_jags_detect_out, "phi", row=2, x=1:13+.2, col=2, add=T)
+# lines(y=hm_jags_detect_out$q50$phi[1,], col=adjustcolor(4, alpha.f=.5), x=1:13, lwd=2)
+# lines(y=hm_jags_detect_out$q50$phi[2,], col=adjustcolor(2, alpha.f=.5), x=1:13+.2, lwd=2)
+grid(nx=NA, ny=NULL)
+legend("bottomleft", legend=c("River", "Lake"), col=c(4,2), lwd=3)
+par(mar=parmar)
+
+points(priver, col=4)
+points(priver-2*se_priver, pch="-", col=4)
+points(priver+2*se_priver, pch="-", col=4)
+points(y=plake, x=1:13+.2, col=2)
+points(y=plake-2*se_plake, pch="-", x=1:13+.2, col=2)
+points(y=plake+2*se_plake, pch="-", x=1:13+.2, col=2)
+
+
+# row is lake, column is survival
+# caterpillar(hm_jags_detect_out, "p", row=1, ylim=0:1, x=1:2-.1,
+#             xax=c("Dead","Alive"), main="Detection Probability")
+# caterpillar(hm_jags_detect_out, "p", row=2, x=1:2+.1, col=2, add=T)
+# legend("bottomleft", legend=c("River", "Lake"), col=c(4,2), lwd=3)
+#
+# caterpillar(hm_jags_detect_out, "p", column=1, ylim=0:1, x=1:2-.1,
+#             xax=c("River", "Lake"), main="Detection Probability")
+# caterpillar(hm_jags_detect_out, "p", column=2, x=1:2+.1, col=2, add=T)
+# legend("bottomleft", legend=c("Dead","Alive"), col=c(4,2), lwd=3)
+
+caterpillar(hm_jags_detect_out, "pvec", main="Detection Probability", col=c(4,4,2,2),
+            xax=rep(c("Dead","Alive"), 2),
+            xlab="River                                             Lake")
+grid(nx=NA, ny=NULL)
