@@ -3,6 +3,5 @@
 .RData
 .Ruserdata
 *.docx
-*.xlsx
 *.pdf
 */raw_data

@@ -113,6 +113,45 @@ Columns include:
 
 \pagebreak
 
+### By Survey
+ 
+This is a data table summarizing results for each survey for all fish.
+
+Columns include:
+
+* *inside_lake* and *outside_lake*: Number of fish that were observed inside vs outside the lake
+* *p_lake*: Estimated proportion (SE) of fish inside lake for that survey
+
+* *inside_spawnarea* and *outside_spawnarea*: Number of fish that were observed inside vs outside the spawning area
+* *p_spawnarea*: Estimated proportion (SE) of fish inside spawning area for that survey
+
+Here's a quick plot of the proportions, plus Jeffreys Beta CI's for the proportions.
+
+```{r}
+par(family="serif")
+par(mar=par("mar")+c(2,0,0,0))
+plot(y=by_survey$inside_lake/(by_survey$inside_lake+by_survey$outside_lake),
+       x=1:nrow(by_survey)-.2,
+     ylim=0:1, col=6, pch=16,
+     xaxt="n", ylab="Proportion", xlab="")
+axis(side=1, at=1:nrow(by_survey), labels=row.names(by_survey),las=2)
+segments(x0=1:nrow(by_survey)-.2,
+         y0=qbeta(0.025, by_survey$inside_lake+0.5, by_survey$outside_lake+0.5),
+         y1=qbeta(0.975, by_survey$inside_lake+0.5, by_survey$outside_lake+0.5), col=6)
+
+points(y=by_survey$inside_spawnarea/(by_survey$inside_spawnarea+by_survey$outside_spawnarea),
+       x=1:nrow(by_survey)+.2,
+     col=3, pch=16)
+segments(x0=1:nrow(by_survey)+.2,
+         y0=qbeta(0.025, by_survey$inside_spawnarea+0.5, by_survey$outside_spawnarea+0.5),
+         y1=qbeta(0.975, by_survey$inside_spawnarea+0.5, by_survey$outside_spawnarea+0.5), col=3)
+legend("topleft", pch=16, lty=1, col=c(3,6), legend=c("Spawning area","Lake"))
+```
+
+
+
+\pagebreak
+
 ### Homerange by Survey
 
 A table of homerange UP TO a given survey.
@@ -163,3 +202,173 @@ par(mar=par("mar")+c(-3.5,0,-1,0))
 plotseq(totaldist_byindiv_bysurvey_fullycum, type="dotline", x="Survey", y="Homerange (rkm)", main="Cumulative homerange")
 lines(colMeans(totaldist_byindiv_bysurvey_fullycum, na.rm=TRUE), lwd=3, lty=2)
 ```
+
+
+\pagebreak
+
+### Hidden Markov survival model
+
+A novel Bayesian Hidden Markov survival model was constructed and implemented using JAGS.  
+
+A survival matrix was first constructed, with a row for each individual and column for each survey following tagging, in which 0=dead, 1=alive, and NA=not observed.  Survival was logically imputed whenever possible: a given fish was recorded as alive during all surveys prior to it being observed as alive, or else recorded as dead during all surveys after it being observed to be dead.
+
+An observation matrix was similarly constructed, with a row for each individual and column for each survey following tagging, in which 0=not observed, 1=observed.  Location was similarly recorded in matrix form, and defined as whether each fish was located in the Lake or River.  If an individual was not observed during a given survey, the last known location was used.
+
+Survival probability was assumed to vary according to each combination of survey (number) and location (Lake or River).  Detection probability was assumed to vary according to survival (Dead or Alive) and location (Lake or River).
+
+The model consisted of the following stochastic relationships:
+
+* Survival $Y_{i,1} \sim Binom(\phi_{l,j},1)$ for the first survey after tagging, and 
+* Survival $Y_{i,j} \sim Binom(\phi_{l,j},Y_{i,j-1})$ thereafter; and,
+* Observation $X_{i,j} \sim Binom(p_{l,s}, 1)$
+
+for
+
+* individual $i \in 1 \dots 100$
+* survey $j \in 1 \dots 13$
+* location $l \in \{Lake, River\}$
+* survival $s \in \{Dead, Alive\}$
+
+All probability parameters $\phi_{l,j}$ and $p_{l,s}$ were given non-informative Jeffreys Beta(0.5, 0.5) priors.
+
+\pagebreak
+
+Results are plotted below for all probability parameters $\phi_{l,j}$ and $p_{l,s}$.  Light and heavy vertical bars correspond to 95% and 50% credible intervals, respectively.
+
+```{r, results='hide', message=FALSE}
+library(jagshelper)
+library(jagsUI)
+
+library(tidyverse)
+
+tracker <- read_csv("FDS_2025/flat_data/tracker.csv") %>%
+  filter(!is.na(Code)) %>%
+  select("10/16/2024", "10/24/2024", "11/1/2024",  "12/27/2024", "3/17/2025",  "5/19/2025",
+         "6/11/2025",  "7/22/2025",  "9/8/2025",   "9/24/2025",  "10/10/2025", "10/22/2025",
+         "10/29/2025")
+
+# # data check
+# for(j in 1:ncol(tracker)) print(table(tracker[,j], useNA='ifany'))
+
+
+Y <- matrix(nrow=nrow(tracker), ncol=ncol(tracker))
+for(j in 1:ncol(tracker)) {
+  Y[,j] <- ifelse(tracker[,j]=="A", 1,
+                      ifelse(tracker[,j]=="M", 0, NA))
+}
+Yraw <- Y
+
+for(i in 1:nrow(Y)) {
+  for(j in 1:ncol(Y)) {
+    if(!is.na(Y[i,j])) {
+      if(Y[i,j]==0) {
+        Y[i,(j:ncol(Y))] <- 0  # dead fish stay dead
+      }
+      if(Y[i,j]==1) {
+        Y[i, 1:j] <- 1  # alive fish were alive before
+      }
+    }
+  }
+}
+
+
+# last known location?
+lake_mat_df <- ptdata %>%
+  select(Code, Survey, lake) %>%
+  mutate(Code = factor(Code)) %>%
+  filter(Survey >= 1) %>%
+  pivot_wider(names_from = Survey, values_from = lake, id_expand = T) %>% data.frame
+lake_mat <- as.matrix(lake_mat_df[,-1])*1
+for(i in 1:nrow(lake_mat)) {  # this is a terrible kludge
+  if(is.na(lake_mat[i,1])) {
+    lake_mat[i,1] <- floor(median(lake_mat[i,], na.rm=TRUE))
+  }
+  for(j in 2:ncol(lake_mat)) {
+    if(is.na(lake_mat[i,j])) {
+      lake_mat[i,j] <- lake_mat[i,j-1]
+    }
+  }
+}
+```
+
+```{r, results='hide', message=FALSE}
+
+
+# specify model, which is written to a temporary file
+hm_jags_detect <- tempfile()
+cat('model {
+  for(i in 1:ni) {
+    Y[i,1] ~ dbin(phi[lake[i,1]+1, 1], 1)
+    X[i,1] ~ dbin(p[lake[i,1]+1, Y[i,1]+1], 1)
+    for(j in 2:whichlast[i]) {#
+      Y[i,j] ~ dbin(phi[lake[i,j]+1, j], Y[i, j-1])
+      X[i,j] ~ dbin(p[lake[i,j]+1, Y[i,j]+1], 1)
+    }
+  }
+
+  for(ip in 1:2) {
+    for(jp in 1:2) {
+      p[ip,jp] ~ dbeta(0.5, 0.5)
+    }
+  }
+
+  for(iphi in 1:2) {
+    for(jphi in 1:nj) {
+      phi[iphi,jphi] ~ dbeta(0.5, 0.5)
+    }
+  }
+  pvec[1] <- p[1,1]
+  pvec[2] <- p[1,2]
+  pvec[3] <- p[2,1]
+  pvec[4] <- p[2,2]
+
+}', file=hm_jags_detect)
+
+whichrows <- rowSums(!is.na(Y)) > 1 & !is.na(by_indiv$homerange)
+
+Y1 <- Y[whichrows,]
+cc <- function(x) x - mean(x, na.rm=TRUE)
+hm_data <- list(Y = Y1,
+                X = 1*(!is.na(Yraw[whichrows,])),
+                lake = lake_mat[whichrows,],
+                whichlast = apply(Y1, 1, \(x) max(which(!is.na(x)))),
+                ni = nrow(Y1),
+                nj = ncol(Y1))
+
+# JAGS controls
+niter <- 50000
+# ncores <- 3
+ncores <- 8# min(10, parallel::detectCores()-1)
+
+{
+  tstart <- Sys.time()
+  # print(tstart)
+  hm_jags_detect_out <- jagsUI::jags(model.file=hm_jags_detect, data=hm_data,
+                                      parameters.to.save=c("Y", "p", "phi","pvec"),
+                                      n.chains=ncores, parallel=T, n.iter=niter,
+                                      n.burnin=niter/2, n.thin=niter/2000)
+  # print(Sys.time() - tstart)
+}
+```
+
+```{r, fig.height=5.5}
+par(family="serif")
+par(mfrow=c(1,1))
+parmar <- par("mar")
+par(mar=c(6,4,4,1))
+caterpillar(hm_jags_detect_out, "phi", row=1, ylim=0:1, 
+            xax=thedates, las=2,
+            main="Survival Probability")
+caterpillar(hm_jags_detect_out, "phi", row=2, x=1:13+.2, col=2, add=T)
+grid(nx=NA, ny=NULL)
+# lines(y=hm_jags_detect_out$q50$phi[1,], col=adjustcolor(4, alpha.f=.5), x=1:13, lwd=2)
+# lines(y=hm_jags_detect_out$q50$phi[2,], col=adjustcolor(2, alpha.f=.5), x=1:13+.2, lwd=2)
+legend("bottomleft", legend=c("River", "Lake"), col=c(4,2), lwd=3)
+par(mar=parmar)
+
+caterpillar(hm_jags_detect_out, "pvec", main="Detection Probability", col=c(4,4,2,2),
+            xax=rep(c("Dead","Alive"), 2), ylim=0:1,
+            xlab="River                                                                 Lake")
+grid(nx=NA, ny=NULL)
+```
+
