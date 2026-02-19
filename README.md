@@ -1,10 +1,82 @@
-# Slana_whitefish_telemetry
+# Seasonal Distribution of Humpback Whitefish in the Slana River
 
-This study will describe the seasonal distribution of humpback whitefish *Coregonus pidschian* captured in the Slana River during fall. Humpback whitefish will be captured using electrofishing techniques during late September before the onset of spawning. One hundred adult humpback whitefish ≥320 mm FL will be surgically implanted with radio tags that will operate for \~25 months. Radiotagged humpbacked whitefish will be aerially tracked throughout the year to determine overall distribution, including overwintering, spawning, and summering areas, as well as migration timing among these locations. A fixed-tracking station will be used to track if/when humpback whitefish leave the Slana River drainage.
+This study will describe the seasonal distribution of humpback whitefish 
+*Coregonus pidschian* captured in the Slana River during fall. Humpback whitefish 
+will be captured using electrofishing techniques during late September before the 
+onset of spawning. One hundred adult humpback whitefish ≥320 mm FL will be surgically 
+implanted with radio tags that will operate for \~25 months. Radiotagged humpbacked 
+whitefish will be aerially tracked throughout the year to determine overall 
+distribution, including overwintering, spawning, and summering areas, as well as 
+migration timing among these locations. A fixed-tracking station will be used to 
+track if/when humpback whitefish leave the Slana River drainage.
+
+## Operational Plan
+
+The published Operational Plan for this study can be found at:
+
+https://www.adfg.alaska.gov/FedAidPDFs/ROP.SF.3F.2024.08.pdf
 
 ## Folder structure
 
-### /OP_2024 Operational Plan 2024
+### /FDS_2025: *FDS Report 2025 (to be published in 2026)*
+
+#### /FDS_2025/R
+
+This folder consists of two R scripts for analyses pertaining to the FDS report 
+to be published in 2026:
+
+* **1_Slana_telemetry_fromobjectives.R** contains all data import and analysis 
+outlined in the Operational Plan objectives.  The majority of the data manipulation
+consisted of handling the spatial river network describing the Slana river using 
+the `riverdist` package, as well as defining observations as inside/outside 
+Mentasta Lake and the principal spawning area.  The majority of data analyses 
+conducted here consisted of summary measures of migration distances and direction,
+and miniumum observed homeranges.
+
+* **2_hiddenmarkov_survivalmod.R** contains an exploration of a novel Bayesian 
+Hidden Markov survival model using the longitudinal data available from this project.
+
+Survival probability $\phi_{l,j}$ was assumed to vary according to each combination of location (Lake or River) and survey (number).  Detection probability $p_{l,s}$ was assumed to vary according to location (Lake or River) and survival (Dead or Alive).
+
+The model consisted of the following stochastic relationships:
+
+  * Survival $Y_{i,1} \sim Binom(\phi_{l,j},1)$ for the first survey after tagging, and 
+  * Survival $Y_{i,j} \sim Binom(\phi_{l,j},Y_{i,j-1})$ thereafter; and,
+  * Observation $X_{i,j} \sim Binom(p_{l,s}, 1)$
+
+for
+
+  * individual $i \in 1 \dots 100$
+  * survey $j \in 1 \dots 13$
+  * location $l \in \{Lake, River\}$
+  * survival $s \in \{Dead, Alive\}$
+
+#### /FDS_2025/output_tables
+
+This folder consists of a collection of output tables, written by the two R scripts
+found in /FDS_2025/R.  All are exported from R directly as .csv files, and are 
+combined in a single spreadsheet **Slana_results_compiled.xlsx**.  All tables
+are described in further detail in **/FDS_2025/Slana_results_annotation.Rmd**.
+
+#### /FDS_2025/flat_data
+
+This folder consists of raw data to be imported by the R scripts found in /FDS_2025/R.
+Two .csv files (**GIS.csv** and **tracker.csv**) contain raw telemetry data, and
+**slanacopper1.Rdata** is an R workspace file containing the cleaned rivernetwork
+object defined as the regions of the Slana and Copper Rivers and tributaries
+relevant to spatial analyses.
+
+#### /FDS_2025/raw_data
+
+This folder consists of .xls and .jpg files provided by the project biologist, 
+and is currently .gitignored.
+
+#### **Slana_results_annotation.Rmd** 
+
+This R Markdown file provides annotation describing all tables found in 
+/FDS_2025/output_tables, as well as some summary visualization.
+
+### /OP_2024: *Operational Plan 2024*
 
 #### /OP_2024/Drafts 
 
