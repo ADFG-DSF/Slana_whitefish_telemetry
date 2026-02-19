@@ -37,7 +37,7 @@ Assignment is shown in the plots below.  These are some pretty rough plots gener
 
 ## Results tables
 
-### Sequential distance
+### Tab: Sequential distance
 
 This gives the net (directional) distance traveled by each fish, between each sequential pair of surveys.
 
@@ -56,7 +56,7 @@ abline(h=0, lty=3)
 
 \pagebreak
 
-### Sequential direction
+### Tab: Sequential direction
 
 This gives the general direction (upstream vs. downstream) traveled by each fish, between each sequential pair of surveys.
 
@@ -74,7 +74,7 @@ mosaicplot(t(raw_dirtable), col=c(4, "grey80", 2), main="Sequential Direction", 
 
 \pagebreak
 
-### Sequential distance by season
+### Tab: Sequential distance by season
 
 This gives the net (directional) distance traveled by each fish, between each pair of seasons
 
@@ -94,7 +94,7 @@ abline(h=0, lty=3)
 
 \pagebreak
 
-### By Individual
+### Tab: By Individual
 
 This is a data table summarizing study-long results FOR EACH FISH.  Maybe not the most interesting, but could be used for further summaries or included as a data appendix. 
 
@@ -113,7 +113,7 @@ Columns include:
 
 \pagebreak
 
-### By Survey
+### Tab: By Survey
  
 This is a data table summarizing results for each survey for all fish.
 
@@ -130,10 +130,12 @@ Here's a quick plot of the proportions, plus Jeffreys Beta CI's for the proporti
 ```{r}
 par(family="serif")
 par(mar=par("mar")+c(2,0,0,0))
+par(xpd=NA)
 plot(y=by_survey$inside_lake/(by_survey$inside_lake+by_survey$outside_lake),
        x=1:nrow(by_survey)-.2,
-     ylim=0:1, col=6, pch=16,
+     ylim=c(0, 1), col=6, pch=16,
      xaxt="n", ylab="Proportion", xlab="")
+# grid(nx=NA, ny=NULL)
 axis(side=1, at=1:nrow(by_survey), labels=row.names(by_survey),las=2)
 segments(x0=1:nrow(by_survey)-.2,
          y0=qbeta(0.025, by_survey$inside_lake+0.5, by_survey$outside_lake+0.5),
@@ -145,14 +147,14 @@ points(y=by_survey$inside_spawnarea/(by_survey$inside_spawnarea+by_survey$outsid
 segments(x0=1:nrow(by_survey)+.2,
          y0=qbeta(0.025, by_survey$inside_spawnarea+0.5, by_survey$outside_spawnarea+0.5),
          y1=qbeta(0.975, by_survey$inside_spawnarea+0.5, by_survey$outside_spawnarea+0.5), col=3)
-legend("topleft", pch=16, lty=1, col=c(3,6), legend=c("Spawning area","Lake"))
+legend(0, 1.2, pch=16, lty=1, col=c(3,6), legend=c("Spawning area","Lake"), bty="n")
 ```
 
 
 
 \pagebreak
 
-### Homerange by Survey
+### Tab: Homerange by Survey
 
 A table of homerange UP TO a given survey.
 
@@ -191,7 +193,7 @@ lines(colMeans(homerange_byindiv_bysurvey_fullycum, na.rm=TRUE), lwd=3, lty=2)
 
 
 
-### Cumulative Distance by Survey
+### Tab: Cumulative Distance by Survey
 
 A table of cumulative distance UP TO a given survey.  If an individual were observed on surveys 0, 1, and 3 (not 2), this would reflect the distance from 0 to 1 plus the distance from 1 to 3.  Each column is a survey, each row is an individual fish.
 
@@ -210,11 +212,11 @@ lines(colMeans(totaldist_byindiv_bysurvey_fullycum, na.rm=TRUE), lwd=3, lty=2)
 
 A novel Bayesian Hidden Markov survival model was constructed and implemented using JAGS.  
 
-A survival matrix was first constructed, with a row for each individual and column for each survey following tagging, in which 0=dead, 1=alive, and NA=not observed.  Survival was logically imputed whenever possible: a given fish was recorded as alive during all surveys prior to it being observed as alive, or else recorded as dead during all surveys after it being observed to be dead.
+A survival matrix was first constructed, with a row for each individual and column for each survey following tagging, in which 0=dead, 1=alive, and NA=unknown.  Survival was logically imputed whenever possible: a given fish was recorded as alive during all surveys prior to it being observed as alive, or else recorded as dead during all surveys after it being observed to be dead.
 
 An observation matrix was similarly constructed, with a row for each individual and column for each survey following tagging, in which 0=not observed, 1=observed.  Location was similarly recorded in matrix form, and defined as whether each fish was located in the Lake or River.  If an individual was not observed during a given survey, the last known location was used.
 
-Survival probability was assumed to vary according to each combination of survey (number) and location (Lake or River).  Detection probability was assumed to vary according to survival (Dead or Alive) and location (Lake or River).
+Survival probability $\phi_{l,j}$ was assumed to vary according to each combination of location (Lake or River) and survey (number).  Detection probability $p_{l,s}$ was assumed to vary according to location (Lake or River) and survival (Dead or Alive).
 
 The model consisted of the following stochastic relationships:
 

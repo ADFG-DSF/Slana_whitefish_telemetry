@@ -430,3 +430,33 @@ caterpillar(hm_jags_detect_out, "pvec", main="Detection Probability", col=c(4,4,
             xax=rep(c("Dead","Alive"), 2),
             xlab="River                                             Lake")
 grid(nx=NA, ny=NULL)
+
+
+## compiling a results table to write to csv
+part1 <- data.frame(parameter="Survival Probability",
+                    location="River",
+                    date=dates,
+                    Survival="",
+                    Estimate=hm_jags_detect_out$q50$phi[1,],
+                    SE=hm_jags_detect_out$sd$phi[1,],
+                    CI95_lo=hm_jags_detect_out$q2.5$phi[1,],
+                    CI95_hi=hm_jags_detect_out$q97.5$phi[1,])
+part2 <- data.frame(parameter="Survival Probability",
+                    location="Lake",
+                    date=dates,
+                    Survival="",
+                    Estimate=hm_jags_detect_out$q50$phi[2,],
+                    SE=hm_jags_detect_out$sd$phi[2,],
+                    CI95_lo=hm_jags_detect_out$q2.5$phi[2,],
+                    CI95_hi=hm_jags_detect_out$q97.5$phi[2,])
+
+part3 <- data.frame(parameter="Detection Probability",
+                    location=c(rep("River", 2), rep("Lake", 2)),
+                    date="",
+                    Survival=rep(c("Dead","Alive"), 2),
+                    Estimate=hm_jags_detect_out$q50$pvec,
+                    SE=hm_jags_detect_out$sd$pvec,
+                    CI95_lo=hm_jags_detect_out$q2.5$pvec,
+                    CI95_hi=hm_jags_detect_out$q97.5$pvec)
+
+# write.csv(rbind(part1, part2, part3), file="FDS_2025/output_tables/HM_survival_detection.csv")
