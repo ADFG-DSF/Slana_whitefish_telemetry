@@ -223,6 +223,114 @@ distance_seq <- with(ptdataA,
 
 
 # 2.	direction traveled between tracking events,
+
+## Defining two functions to handle the lake (patched versions of functions from riverdist)
+## Movement within the lake: "in-lake"
+## Movement from river to lake: "up"
+## Movement from lake to river: "down"
+## Movement from river to river: whatever it would normally have been
+
+riverdirection_patch <- function (startseg, endseg, startvert, endvert, rivers, flowconnected = FALSE,
+          stopiferror = TRUE, algorithm = NULL, startlake, endlake)  ## lake is defined as logical
+{
+  if (!inherits(rivers, "rivernetwork"))
+    stop("Argument 'rivers' must be of class 'rivernetwork'.  See help(line2network) for more information.")
+  if (max(c(startseg, endseg), na.rm = T) > length(rivers$lines) |
+      min(c(startseg, endseg), na.rm = T) < 1) {
+    stop("Invalid segments specified.")
+  }
+  if (startvert > dim(rivers$lines[[startseg]])[1] | startvert <
+      1 | endvert > dim(rivers$lines[[endseg]])[1] | endvert <
+      1) {
+    stop("Invalid vertex specified.")
+  }
+  if (is.na(rivers$mouth$mouth.seg) | is.na(rivers$mouth$mouth.vert)) {
+    stop("Error - Need to specify segment & vertex of river mouth")
+  }
+  direction <- "0"
+  flowc <- isflowconnected(seg1 = startseg, seg2 = endseg,
+                           rivers = rivers, stopiferror = stopiferror, algorithm = algorithm)
+  if (!stopiferror & is.na(flowc))
+    direction <- NA
+  if(startlake | endlake) {
+    if(startlake & endlake) {
+      direction <- "in-lake"
+    }
+    if(startlake & !endlake) {
+      direction <- "down"
+    }
+    if(!startlake & endlake) {
+      direction <- "up"
+    }
+  } else {
+  if (!is.na(flowc)) {
+    if (flowconnected & !flowc)
+      direction <- NA
+    if (!flowconnected | flowc) {
+      if (riverdistance(startseg = rivers$mouth$mouth.seg,
+                        endseg = startseg, startvert = rivers$mouth$mouth.vert,
+                        endvert = startvert, rivers = rivers, stopiferror = stopiferror,
+                        algorithm = algorithm) < riverdistance(startseg = rivers$mouth$mouth.seg,
+                                                               endseg = endseg, startvert = rivers$mouth$mouth.vert,
+                                                               endvert = endvert, rivers = rivers, stopiferror = stopiferror,
+                                                               algorithm = algorithm)) {
+        direction <- "up"
+      }
+      if (riverdistance(startseg = rivers$mouth$mouth.seg,
+                        endseg = startseg, startvert = rivers$mouth$mouth.vert,
+                        endvert = startvert, rivers = rivers, stopiferror = stopiferror,
+                        algorithm = algorithm) > riverdistance(startseg = rivers$mouth$mouth.seg,
+                                                               endseg = endseg, startvert = rivers$mouth$mouth.vert,
+                                                               endvert = endvert, rivers = rivers, stopiferror = stopiferror,
+                                                               algorithm = algorithm)) {
+        direction <- "down"
+      }
+    }
+  }}
+  return(direction)
+}
+
+riverdirectionseq_patch <- function (unique, survey, seg, vert, rivers, logical = NULL,
+          flowconnected = FALSE, stopiferror = TRUE, algorithm = NULL, lake)
+{
+  if (!inherits(rivers, "rivernetwork"))
+    stop("Argument 'rivers' must be of class 'rivernetwork'.  See help(line2network) for more information.")
+  if (is.null(logical))
+    logical <- rep(T, length(unique))
+  unique <- unique[logical]
+  survey <- survey[logical]
+  seg <- seg[logical]
+  vert <- vert[logical]
+  tab <- table(unique, survey)
+  if (max(tab) > 1)
+    cat("Warning: multiple entries exist for at least one unique/survey combination (first one used)")
+  dists <- matrix(NA, nrow = dim(tab)[1], ncol = (dim(tab)[2] -
+                                                    1))
+  for (i in 1:dim(tab)[1]) {
+    for (j in 1:(dim(tab)[2] - 1)) {
+      if (tab[i, j] * tab[i, (j + 1)] != 0) {
+        dists[i, j] <- riverdirection_patch(startseg = seg[unique == sort(unique(unique))[i] & survey == sort(unique(survey))[j]][1],
+                                      endseg = seg[unique == sort(unique(unique))[i] &  survey == sort(unique(survey))[j + 1]][1],
+                                      startvert = vert[unique == sort(unique(unique))[i] &  survey == sort(unique(survey))[j]][1],
+                                      endvert = vert[unique == sort(unique(unique))[i] & survey == sort(unique(survey))[j + 1]][1],
+                                      rivers = rivers, flowconnected = flowconnected,
+                                      stopiferror = stopiferror, algorithm = algorithm,
+                                      startlake = lake[unique == sort(unique(unique))[i] &  survey == sort(unique(survey))[j]][1],
+                                      endlake = lake[unique == sort(unique(unique))[i] & survey == sort(unique(survey))[j + 1]][1])
+      }
+    }
+  }
+  dists <- as.data.frame(dists)
+  row.names(dists) <- row.names(tab)
+  col.name <- NA
+  for (j in 1:(length(dimnames(tab)$survey) - 1)) col.name[j] <- paste(dimnames(tab)$survey[j],
+                                                                       "to", dimnames(tab)$survey[j + 1])
+  names(dists) <- col.name
+  dists <- dists[rowSums(is.na(dists)) != ncol(dists), ]
+  return(dists)
+}
+
+
 # direction_seq <- with(ptdata,
 #                       riverdirectionseq(unique=Code,
 #                                         seg=seg, vert=vert,
@@ -230,11 +338,17 @@ distance_seq <- with(ptdataA,
 #                                         rivers=slanacopper1))
 
 # subset of fish that are Alive
+# direction_seq <- with(ptdataA,
+#                       riverdirectionseq(unique=Code,
+#                                         seg=seg, vert=vert,
+#                                         survey=Survey,
+#                                         rivers=slanacopper1))
 direction_seq <- with(ptdataA,
-                      riverdirectionseq(unique=Code,
+                      riverdirectionseq_patch(unique=Code,
                                         seg=seg, vert=vert,
                                         survey=Survey,
-                                        rivers=slanacopper1))
+                                        lake=lake,
+                                        rivers=slanacopper1,))
 raw_dirtable <- apply(direction_seq, 2,
       \(x) table(factor(x, levels=c("down","0","up"))))
 mosaicplot(t(raw_dirtable))
