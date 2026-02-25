@@ -350,7 +350,7 @@ direction_seq <- with(ptdataA,
                                         lake=lake,
                                         rivers=slanacopper1,))
 raw_dirtable <- apply(direction_seq, 2,
-      \(x) table(factor(x, levels=c("down","0","up"))))
+      \(x) table(factor(x, levels=c("up","in-lake","0","down"))))
 mosaicplot(t(raw_dirtable))
 
 

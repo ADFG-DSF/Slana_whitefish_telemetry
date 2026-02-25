@@ -63,13 +63,23 @@ This gives the general direction (upstream vs. downstream) traveled by each fish
 * Each row is an instrumented fish
 * Each column is a pair of surveys (0 to 1, 1 to 2, etc.)
 * If a fish was not observed during one of each pair of surveys, the entry is recorded as NA
+* All movement from the river to the lake was coded as upstream
+* All movement from the lake to the river was coded as downstream
+* All movement within the lake was given its own category
 
 Here's a very simple plot of overall trends, or lack thereof:
+
+```{r, eval=FALSE}
+knitr::kable(raw_dirtable)
+```
 
 ```{r}
 par(family="serif")
 par(mar=par("mar")+c(-1,0,2,0))
-mosaicplot(t(raw_dirtable), col=c(4, "grey80", 2), main="Sequential Direction", xlab="Survey pair", las=2)
+dimnames(raw_dirtable)[[1]] <- rep(NA,4)
+mosaicplot(t(raw_dirtable), col=c(2, 3, "grey80",4), main="Sequential Direction", xlab="Survey pair", las=2)
+# par(xpd=NA)
+legend(-.15,.7, legend=c("up","in-lake","0","down"), fill=c(2, 3, "grey80",4), xpd=NA, cex=.9)
 ```
 
 \pagebreak
@@ -130,12 +140,12 @@ Here's a quick plot of the proportions, plus Jeffreys Beta CI's for the proporti
 ```{r}
 par(family="serif")
 par(mar=par("mar")+c(2,0,0,0))
-par(xpd=NA)
+# par(xpd=NA)
 plot(y=by_survey$inside_lake/(by_survey$inside_lake+by_survey$outside_lake),
        x=1:nrow(by_survey)-.2,
      ylim=c(0, 1), col=6, pch=16,
      xaxt="n", ylab="Proportion", xlab="")
-# grid(nx=NA, ny=NULL)
+grid(nx=NA, ny=NULL)
 axis(side=1, at=1:nrow(by_survey), labels=row.names(by_survey),las=2)
 segments(x0=1:nrow(by_survey)-.2,
          y0=qbeta(0.025, by_survey$inside_lake+0.5, by_survey$outside_lake+0.5),
@@ -147,7 +157,7 @@ points(y=by_survey$inside_spawnarea/(by_survey$inside_spawnarea+by_survey$outsid
 segments(x0=1:nrow(by_survey)+.2,
          y0=qbeta(0.025, by_survey$inside_spawnarea+0.5, by_survey$outside_spawnarea+0.5),
          y1=qbeta(0.975, by_survey$inside_spawnarea+0.5, by_survey$outside_spawnarea+0.5), col=3)
-legend(0, 1.2, pch=16, lty=1, col=c(3,6), legend=c("Spawning area","Lake"), bty="n")
+legend(0, 1.2, pch=16, lty=1, col=c(3,6), legend=c("Spawning area","Lake"), bty="n", xpd=NA)
 ```
 
 
